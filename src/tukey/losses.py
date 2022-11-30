@@ -180,7 +180,7 @@ class GaussianLoss(_Loss):
         z
             standardized normal, can be used when we want to add spatio-temporal correlation
         """
-        mean, precision = torch.split(params, dim=1)
+        mean, precision = torch.split(params, self.n_target_channels, dim=1)
         precision = self._transform_precision(precision)
         if z is None:
             z = torch.randn_like(mean)
