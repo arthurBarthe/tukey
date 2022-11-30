@@ -365,7 +365,7 @@ class TuckeyGandHloss(_Loss):
         z
             standardized normal, can be used when we want to add spatio-temporal correlation
         """
-        epsilon, beta, g, h = torch.split(input, self.n_target_channels, dim=1)
+        epsilon, beta, g, h = torch.split(params, self.n_target_channels, dim=1)
         beta = self._transform_beta(beta)
         g, h = self._transform_g_h(g, h)
         if z is None:
