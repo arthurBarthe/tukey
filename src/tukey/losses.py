@@ -344,10 +344,11 @@ class TuckeyGandHloss(_Loss):
         return z
 
     def _transform_g_h(self, g, h):
-        g = (torch.sigmoid(g) - 0.5) * 2
+        # TODO temporary fix for g==0
+        g = (torch.sigmoid(g + 1e-12) - 0.5) * 2
         # works well enough
         # h = torch.nn.functional.softplus(h)
-        h = torch.exp(-h)
+        h = torch.sigmoid(h - 2)
         return g, h
 
     def _transform_beta(self, beta):
