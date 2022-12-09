@@ -102,7 +102,7 @@ class CauchyLoss(_Loss):
         return list(range(self.n_target_channels, self.n_required_channels))
 
 
-class HeteroskedasticGaussianLossV2(_Loss):
+class GaussianLoss(_Loss):
     """Class for Gaussian likelihood"""
 
     def __init__(self, n_target_channels: int = 1, bias: float = 0.,
@@ -266,9 +266,10 @@ class Tuckey_g_h_inverse(Function):
 
 
 class TuckeyGandHloss(_Loss):
-    def __init__(self, n_target_channels: int = 2):
+    def __init__(self, n_target_channels: int = 2, hmax: float = 1.):
         super().__init__()
         self.n_target_channels = n_target_channels
+        self.hmax = hmax
         self.inverse_tuckey = Tuckey_g_h_inverse()
 
     @property
@@ -328,11 +329,16 @@ class TuckeyGandHloss(_Loss):
         g = (torch.sigmoid(g) - 0.5) * 2
         # works well enough
         # h = torch.nn.functional.softplus(h)
-        h = torch.exp(-h)
+        h = torch.sigmoid(h - 5) * self.hmax
         return g, h
 
     def _transform_beta(self, beta):
         return softplus(beta)
+
+    def cdf(self, g, h, z_tilda):
+        from scipy.stats import norm
+        z = self.inverse_tuckey.apply(z_tilda, g, h)
+        return norm().cdf(z)
 
 
 if __name__ == '__main__':
