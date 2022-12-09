@@ -291,6 +291,12 @@ class TuckeyGandHloss(_Loss):
         self.hmax = hmax
         self.inverse_tuckey = Tuckey_g_h_inverse()
 
+    @staticmethod
+    def tuckey_g_h(z, g, h):
+        out = 1 / g * torch.expm1(g * z) * torch.exp(h * z ** 2 / 2)
+        out[g == 0] = z * torch.exp(h * z ** 2 / 2)
+        return out
+
     @property
     def n_required_channels(self):
         """Return the number of required channels for the input. For each
@@ -372,7 +378,7 @@ class TuckeyGandHloss(_Loss):
         g, h = self._transform_g_h(g, h)
         if z is None:
             z = torch.randn_like(epsilon)
-        return epsilon + 1 / beta * self.inverse_tuckey.tuckey_g_h(z, g, h)
+        return epsilon + 1 / beta * self.tuckey_g_h(z, g, h)
 
 
 if __name__ == '__main__':
