@@ -294,7 +294,7 @@ class TuckeyGandHloss(_Loss):
     @staticmethod
     def tuckey_g_h(z, g, h):
         out = 1 / g * torch.expm1(g * z) * torch.exp(h * z ** 2 / 2)
-        out[g == 0] = z * torch.exp(h * z ** 2 / 2)
+        out[g == 0] = (z * torch.exp(h * z ** 2 / 2))[g == 0]
         return out
 
     @property
