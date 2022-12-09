@@ -168,6 +168,25 @@ class GaussianLoss(_Loss):
     def _transform_precision(self, precision):
         return softplus(precision)
 
+    def sample(self, params: torch.tensor, z: torch.tensor = None):
+        """
+        Sample from i.i.d. Gaussian distributions with parameters specified by the passed params (although they still
+        need to be transformed.
+
+        Parameters
+        ----------
+        params
+            parameters of the Gaussian distributions with shape (N, 2 * C, H, W)
+        z
+            standardized normal, can be used when we want to add spatio-temporal correlation
+        """
+        mean, precision = torch.split(params, self.n_target_channels, dim=1)
+        precision = self._transform_precision(precision)
+        if z is None:
+            z = torch.randn_like(mean)
+        return mean + 1 / precision * z
+
+
 
 
 class Tuckey_g_h_inverse(Function):
@@ -326,7 +345,8 @@ class TuckeyGandHloss(_Loss):
         return z
 
     def _transform_g_h(self, g, h):
-        g = (torch.sigmoid(g) - 0.5) * 2
+        # TODO temporary fix for g==0
+        g = (torch.sigmoid(g + 1e-12) - 0.5) * 2
         # works well enough
         # h = torch.nn.functional.softplus(h)
         h = torch.sigmoid(h - 5) * self.hmax
@@ -335,10 +355,24 @@ class TuckeyGandHloss(_Loss):
     def _transform_beta(self, beta):
         return softplus(beta)
 
-    def cdf(self, g, h, z_tilda):
-        from scipy.stats import norm
-        z = self.inverse_tuckey.apply(z_tilda, g, h)
-        return norm().cdf(z)
+    def sample(self, params: torch.tensor, z: torch.tensor = None):
+        """
+        Sample from i.i.d. Gaussian distributions with parameters specified by the passed params (although they still
+        need to be transformed.
+
+        Parameters
+        ----------
+        params
+            parameters of the Gaussian distributions with shape (N, 2 * C, H, W)
+        z
+            standardized normal, can be used when we want to add spatio-temporal correlation
+        """
+        epsilon, beta, g, h = torch.split(params, self.n_target_channels, dim=1)
+        beta = self._transform_beta(beta)
+        g, h = self._transform_g_h(g, h)
+        if z is None:
+            z = torch.randn_like(epsilon)
+        return epsilon + 1 / beta * self.inverse_tuckey.tuckey_g_h(z, g, h)
 
 
 if __name__ == '__main__':
