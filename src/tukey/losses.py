@@ -187,6 +187,35 @@ class GaussianLoss(_Loss):
         return mean + 1 / precision * z
 
 
+class BivariateGaussianLoss(_Loss):
+    def __init__(self):
+        super(BivariateGaussianLoss, self).__init__()
+
+    def pointwise_likelihood(self, input: torch.Tensor, target: torch.Tensor):
+        # Split the target into mean (first half of channels) and scale
+        mean, precision, theta = torch.split(input, (2, 2, 1), dim=1)
+        precision = self._transform_precision(precision)
+        target = target - mean
+        #apply rotation
+        component1 = torch.cos(theta) * target[:, 0] - torch.sin(theta) * target[:, 1]
+        component2 = - torch.sin(theta) * target[:, 0] + torch.cos(theta) * target[:, 1]
+        target = torch.cat((component1, component2), dim=1)
+        if not torch.all(precision > 0):
+            raise ValueError('Got a non-positive variance value. \
+                             Pre-processed variance tensor was: \
+                                 {}'.format(torch.min(precision)))
+        term1 = - torch.log(precision)
+        term2 = 1 / 2 * target ** 2 * precision ** 2
+        return term1 + term2
+
+    def forward(self, input: torch.Tensor, target: torch.Tensor):
+        lkhs = self.pointwise_likelihood(input, target)
+        # Ignore nan values in targets.
+        lkhs = lkhs[~torch.isnan(target)]
+        return lkhs.mean()
+
+    def _transform_precision(self, precision):
+        return softplus(precision)
 
 
 class Tuckey_g_h_inverse(Function):
