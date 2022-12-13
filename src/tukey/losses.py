@@ -197,8 +197,8 @@ class BivariateGaussianLoss(_Loss):
         precision = self._transform_precision(precision)
         target = target - mean
         #apply rotation
-        component1 = torch.cos(theta) * target[:, 0] - torch.sin(theta) * target[:, 1]
-        component2 = - torch.sin(theta) * target[:, 0] + torch.cos(theta) * target[:, 1]
+        component1 = torch.cos(theta) * target[:, 0:1] - torch.sin(theta) * target[:, 1:2]
+        component2 = - torch.sin(theta) * target[:, 0:1] + torch.cos(theta) * target[:, 1:2]
         target = torch.cat((component1, component2), dim=1)
         if not torch.all(precision > 0):
             raise ValueError('Got a non-positive variance value. \
