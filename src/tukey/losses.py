@@ -195,6 +195,7 @@ class BivariateGaussianLoss(_Loss):
         # Split the target into mean (first half of channels) and scale
         mean, precision, theta = torch.split(input, (2, 2, 1), dim=1)
         precision = self._transform_precision(precision)
+        theta = self._transform_theta(theta)
         target = target - mean
         #apply rotation
         component1 = torch.cos(theta) * target[:, 0:1] - torch.sin(theta) * target[:, 1:2]
@@ -216,6 +217,32 @@ class BivariateGaussianLoss(_Loss):
 
     def _transform_precision(self, precision):
         return softplus(precision)
+
+    def _transform_theta(self, theta):
+        return theta * 2 * torch.pi
+
+    def sample(self, params: torch.tensor, z: torch.tensor = None):
+        """
+        Sample from i.i.d. Gaussian distributions with parameters specified by the passed params (although they still
+        need to be transformed.
+
+        Parameters
+        ----------
+        params
+            parameters of the Gaussian distributions with shape (N, 2 * C, H, W)
+        z
+            standardized normal, can be used when we want to add spatio-temporal correlation
+        """
+        mean, precision, theta = torch.split(params, (2, 2, 1), dim=1)
+        precision = self._transform_precision(precision)
+        theta = - self._transform_theta(theta)
+        if z is None:
+            z = torch.randn_like(mean)
+        epsilon = 1 / precision * z
+        component1 = torch.cos(theta) * epsilon[:, 0:1] - torch.sin(theta) * epsilon[:, 1:2]
+        component2 = - torch.sin(theta) * epsilon[:, 0:1] + torch.cos(theta) * epsilon[:, 1:2]
+        s = torch.cat((component1, component2), dim=1)
+        return s + mean
 
 
 class Tuckey_g_h_inverse(Function):
