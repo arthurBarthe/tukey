@@ -273,7 +273,8 @@ class Tuckey_g_h_inverse(Function):
             min_[z_tilda > value] = middle[z_tilda > value]
         middle = (min_ + max_) / 2
         middle[torch.isnan(z_tilda)] = np.nan
-        ctx.save_for_backward(middle, g, h)
+        if ctx is not None:
+            ctx.save_for_backward(middle, g, h)
         return middle
 
     @staticmethod
@@ -302,7 +303,8 @@ class Tuckey_g_h_inverse(Function):
         nodes = nodes.flatten()
         z = nodes[i_node]
         z = z.reshape(init_shape)
-        ctx.save_for_backward(z, g, h)
+        if ctx is not None:
+            ctx.save_for_backward(z, g, h)
         return z
 
     @staticmethod
@@ -319,6 +321,7 @@ class Tuckey_g_h_inverse(Function):
 
     @staticmethod
     def d_tau_d_g(z, g, h):
+        """derivative of Tukey g-and-h transform with respect to g"""
         out = - 1 / g * Tuckey_g_h_inverse.tuckey_g_h(z, g, h)
         out = out + 1 / g * z * torch.exp(g * z + 1 / 2 * h * z ** 2)
         Tuckey_g_h_inverse.assert_finite(out)
@@ -326,10 +329,12 @@ class Tuckey_g_h_inverse(Function):
 
     @staticmethod
     def d_tau_d_h(z, g, h):
+        """derivative of Tukey g-and-h transform with respect to h"""
         return 1 / 2 * z ** 2 * Tuckey_g_h_inverse.tuckey_g_h(z, g, h)
 
     @staticmethod
     def d_tau_d_z(z, g, h):
+        """derivative of Tukey g-and-h transform with respect to z"""
         out = torch.exp(g * z + h * z ** 2 / 2)
         out = out + h * z * Tuckey_g_h_inverse.tuckey_g_h(z, g, h)
         return out
@@ -341,9 +346,10 @@ class Tuckey_g_h_inverse(Function):
 
 
 class TuckeyGandHloss(_Loss):
-    def __init__(self, n_target_channels: int = 2, hmax: float = 1.):
+    def __init__(self, n_target_channels: int = 2, hmax: float = 0.02, gmax: float = 0.02):
         super().__init__()
         self.n_target_channels = n_target_channels
+        self.gmax = gmax
         self.hmax = hmax
         self.inverse_tuckey = Tuckey_g_h_inverse()
 
@@ -408,7 +414,7 @@ class TuckeyGandHloss(_Loss):
 
     def _transform_g_h(self, g, h):
         # TODO temporary fix for g==0
-        g = (torch.sigmoid(g + 1e-12) - 0.5) * 2
+        g = (torch.sigmoid(g + 1e-12) - 0.5) * 2 * self.gmax
         # works well enough
         # h = torch.nn.functional.softplus(h)
         h = torch.sigmoid(h - 5) * self.hmax
@@ -453,6 +459,6 @@ if __name__ == '__main__':
     # evaluated with these tensors are close enough to numerical
     # approximations and returns True if they all verify this condition.
     print('start test')
-    test2 = gradcheck(tgh.forward, (input, target), eps=1e-4, atol=0.01)
+    test2 = gradcheck(tgh.forward, (input, target), eps=1e-2, atol=0.001)
     print(test2)
 
