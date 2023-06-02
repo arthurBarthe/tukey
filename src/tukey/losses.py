@@ -262,7 +262,7 @@ class Tuckey_g_h_inverse(Function):
         min_ = torch.ones_like(z_tilda) * min_
         max_ = torch.ones_like(z_tilda) * max_
         middle = min_
-        for i in range(30):
+        for i in range(100):
             old_middle = middle
             middle = (min_ + max_) / 2.
             if torch.all(torch.abs(middle - old_middle) <= torch.finfo(
@@ -346,7 +346,7 @@ class Tuckey_g_h_inverse(Function):
 
 
 class TuckeyGandHloss(_Loss):
-    def __init__(self, n_target_channels: int = 2, hmax: float = 0.02, gmax: float = 0.02):
+    def __init__(self, n_target_channels: int = 2, hmax: float = 1, gmax: float = 1):
         super().__init__()
         self.n_target_channels = n_target_channels
         self.gmax = gmax
@@ -416,12 +416,12 @@ class TuckeyGandHloss(_Loss):
         # TODO temporary fix for g==0
         g = (torch.sigmoid(g + 1e-12) - 0.5) * 2 * self.gmax
         # works well enough
-        # h = torch.nn.functional.softplus(h)
-        h = torch.sigmoid(h - 5) * self.hmax
+        h = torch.nn.functional.softplus(h) * self.hmax
+        #h = torch.sigmoid(h) * self.hmax
         return g, h
 
     def _transform_beta(self, beta):
-        return softplus(beta)
+        return torch.nn.functional.softplus(beta)
 
     def sample(self, params: torch.tensor, z: torch.tensor = None):
         """
