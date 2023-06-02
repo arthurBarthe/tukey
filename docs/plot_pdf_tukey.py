@@ -3,23 +3,17 @@ import torch
 from scipy.stats import norm
 import matplotlib.pyplot as plt
 from tukey.losses import Tuckey_g_h_inverse
+from tukey.utils import compute_pdf_tukey
 
 # script parameters
 LOG = False
 
 # parameters of the transformation
 g, h = -0.6, 0.3
-tukey_inverse = Tuckey_g_h_inverse()
 
 # grid points
 z_tildas = torch.linspace(-5, 5, 1000)
-g_ = torch.ones_like(z_tildas) * g
-h_ = torch.ones_like(z_tildas) * h
-zs = tukey_inverse.apply(z_tildas, g_, h_)
-f_zs = norm.pdf(zs)
-d_tau_d_zs = tukey_inverse.d_tau_d_z(zs, g_, h_)
-
-pdf = 1 / d_tau_d_zs * f_zs
+pdf = compute_pdf_tukey(z_tildas, g, h)
 
 fig = plt.figure()
 ax = fig.add_subplot()
