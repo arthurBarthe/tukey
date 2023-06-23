@@ -27,12 +27,12 @@ class RNN(Module):
         self.hidden_size = hidden_size
         self.hidden = self.initHidden()
 
-        self.i2h = nn.Linear(input_size + hidden_size, hidden_size)
-        self.i2o = nn.Linear(input_size + hidden_size, output_size)
+        self.i2h = NN((input_size + hidden_size, 256, 256), hidden_size)
+        self.i2o = NN((input_size + hidden_size, 256, 256), output_size)
 
     def forward(self, input):
-        combined = torch.cat((input, self.hidden), 1)
-        self.hidden = self.i2h(combined)
+        combined = torch.cat((input, self.hidden[-1]), 1)
+        self.hidden.append(self.i2h(combined))
         output = self.i2o(combined)
         return output
 
@@ -44,4 +44,4 @@ class RNN(Module):
         return output
 
     def initHidden(self):
-        return torch.zeros(1, self.hidden_size)
+        return [torch.zeros(1, self.hidden_size), ]
