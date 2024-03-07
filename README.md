@@ -4,3 +4,8 @@ loss function.
 The inversion of the Tukey g-and-h transform is performed within the class Tuckey_g_h_inverse. It relies on
 a binary search. This class also implements the derivatives of the inverse Tukey g-and-h transform with
 respect to its parameters, necessary to the evaluation of the likelihood.
+
+The simulation studies from the paper can be found in the Jupyter notebook docs/simulation_study.ipynb.
+The application to global crop yield prediction can be found in docs/crop_yield_application.ipynb.
+
+NB: I need to clean these (and delete some uncessary notebooks) before making the repo public.
