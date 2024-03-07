@@ -129,6 +129,7 @@ class GaussianLoss(_Loss):
     def pointwise_likelihood(self, input: torch.Tensor, target: torch.Tensor):
         # Split the target into mean (first half of channels) and scale
         mean, precision = torch.split(input, self.n_target_channels, dim=1)
+        precision = self._transform_precision(precision)
         if not torch.all(precision > 0):
             raise ValueError('Got a non-positive variance value. \
                              Pre-processed variance tensor was: \
@@ -142,9 +143,9 @@ class GaussianLoss(_Loss):
         return term1 + term2
 
     def forward(self, input: torch.Tensor, target: torch.Tensor):
-        mean, precision = torch.split(input, self.n_target_channels, dim=1)
-        precision = self._transform_precision(precision)
-        input = torch.cat((mean, precision), dim=1)
+        #mean, precision = torch.split(input, self.n_target_channels, dim=1)
+        #precision = self._transform_precision(precision)
+        #input = torch.cat((mean, precision), dim=1)
         lkhs = self.pointwise_likelihood(input, target)
         # Ignore nan values in targets.
         lkhs = lkhs[~torch.isnan(target)]
@@ -257,12 +258,12 @@ class Tuckey_g_h_inverse(Function):
         """New inverse method based on dichotomial algorithm. Finds true
         inverse up to numerical precision"""
         g[g == 0.] = torch.finfo().eps
-        min_ = -10
-        max_ = 10
+        min_ = -40
+        max_ = 40
         min_ = torch.ones_like(z_tilda) * min_
         max_ = torch.ones_like(z_tilda) * max_
         middle = min_
-        for i in range(100):
+        while True:
             old_middle = middle
             middle = (min_ + max_) / 2.
             if torch.all(torch.abs(middle - old_middle) <= torch.finfo(
@@ -275,6 +276,8 @@ class Tuckey_g_h_inverse(Function):
         middle[torch.isnan(z_tilda)] = np.nan
         if ctx is not None:
             ctx.save_for_backward(middle, g, h)
+        assert not torch.any(middle == -40), 'Left boundary'
+        assert not torch.any(middle == 40), 'right boundary'
         return middle
 
     @staticmethod
@@ -367,6 +370,10 @@ class TuckeyGandHloss(_Loss):
         return self.n_target_channels * 4
 
     def forward(self, input, target):
+        lkh = self.pointwise_likelihood(input, target)
+        return lkh.mean()
+    
+    def pointwise_likelihood(self, input, target):
         epsilon, beta, g, h = torch.split(input, self.n_target_channels, dim=1)
         beta = self._transform_beta(beta)
         g, h = self._transform_g_h(g, h)
@@ -380,7 +387,6 @@ class TuckeyGandHloss(_Loss):
         lkh = torch.log(for_log)
         lkh = lkh + (h + 1) / 2 * z ** 2
         lkh = lkh - torch.log(beta)
-        lkh = lkh.mean()
         return lkh
 
     @property

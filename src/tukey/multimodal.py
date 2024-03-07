@@ -6,6 +6,7 @@ distribution, the neural network may output the parameters of two Gaussian distr
 
 import torch
 from torch.nn.modules.loss import _Loss
+from torch.nn.functional import softplus
 
 
 class MultimodalLoss(_Loss):
@@ -75,7 +76,9 @@ class MultimodalLoss(_Loss):
         losses_values = []
         for i, (loss, input) in enumerate(zip(self.losses, inputs)):
             proba_i = torch.stack([proba[:, i, ...] for proba in probas], dim=1)
-            loss_i = torch.log(proba_i) - loss.pointwise_likelihood(input, target)
+            loss_i = - loss.pointwise_likelihood(input, target)
+            #print(loss_i)
+            loss_i = loss_i + torch.log(proba_i)
             losses_values.append(loss_i)
         loss = torch.stack(losses_values, dim=2)
         final_loss = -torch.logsumexp(loss, dim=2)
@@ -89,12 +92,7 @@ class MultimodalLoss(_Loss):
         probas = [torch.softmax(proba, dim=1) for proba in probas]
         predictions = [loss.predict(input) for loss, input in
                        zip(self.losses, inputs)]
-        weighted_predictions = []
-        for i, pred in enumerate(predictions):
-            proba_i = torch.stack([proba[:, i, ...] for proba in probas], dim=1)
-            weighted_predictions.append(proba_i * pred)
-        final_predictions = sum(weighted_predictions)
-        return final_predictions
+        return probas, predictions
 
 
 class BimodalGaussianLoss(MultimodalLoss):

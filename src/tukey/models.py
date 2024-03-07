@@ -1,20 +1,23 @@
 import torch
 import torch.nn as nn
 from torch.nn import Module, Sequential, Linear
-from torch.nn import ReLU
+from torch.nn import ReLU, BatchNorm1d
 
 
 class NN(Sequential):
-    def __init__(self, structure: list, n_out: int):
+    def __init__(self, structure: list, n_out: int, batch_norm: bool = False):
         subblocks = []
         self.n_out = n_out
+        self.batch_norm = batch_norm
         for i in range(len(structure) - 1):
             subblocks.extend(self._make_sublock(structure[i], structure[i + 1]))
         subblocks.extend(self._make_final_layer(structure[-1]))
         super().__init__(*subblocks)
 
     def _make_sublock(self, n_in: int, n_out: int):
-        return [Linear(n_in, n_out), ReLU()]#, BatchNorm1d(n_out)]
+        if not self.batch_norm:
+            return [Linear(n_in, n_out), ReLU()]
+        return [Linear(n_in, n_out), ReLU(), BatchNorm1d(n_out)]
 
     def _make_final_layer(self, n_in : int):
         return [Linear(n_in, self.n_out), ]
