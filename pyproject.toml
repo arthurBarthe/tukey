@@ -14,6 +14,7 @@ torch = "^2.0.0"
 ipykernel = "^6.22.0"
 pandas = "^2.0.0"
 netcdf4 = "^1.6.4"
+cartopy = "*"
 
 
 [build-system]
