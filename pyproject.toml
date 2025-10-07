@@ -16,6 +16,11 @@ pandas = "^2.0.0"
 netcdf4 = "^1.6.4"
 cartopy = "*"
 ipympl = "^0.9.7"
+pytorch-ignite = "^0.5.2"
+optuna = "^4.5.0"
+plotly = "^6.3.0"
+tensorboard = "^2.20.0"
+optuna-dashboard = "^0.19.0"
 
 
 [build-system]

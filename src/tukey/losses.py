@@ -258,10 +258,10 @@ class Tuckey_g_h_inverse(Function):
         """New inverse method based on dichotomial algorithm. Finds true
         inverse up to numerical precision"""
         g[g == 0.] = torch.finfo().eps
-        min_ = -40
-        max_ = 40
-        min_ = torch.ones_like(z_tilda) * min_
-        max_ = torch.ones_like(z_tilda) * max_
+        min__ = -200
+        max__ = 200
+        min_ = torch.ones_like(z_tilda) * min__
+        max_ = torch.ones_like(z_tilda) * max__
         middle = min_
         while True:
             old_middle = middle
@@ -276,8 +276,8 @@ class Tuckey_g_h_inverse(Function):
         middle[torch.isnan(z_tilda)] = np.nan
         if ctx is not None:
             ctx.save_for_backward(middle, g, h)
-        assert not torch.any(middle == -40), 'Left boundary'
-        assert not torch.any(middle == 40), 'right boundary'
+        assert not torch.any(middle == min__), 'Left boundary'
+        assert not torch.any(middle == max__), 'right boundary'
         return middle
 
     @staticmethod
