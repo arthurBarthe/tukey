@@ -20,8 +20,8 @@ from ignite.engine import create_supervised_evaluator, create_supervised_trainer
 from ignite.metrics import Loss
 from tukey.models import NN
 
-from docs.crop_yield_study.data_process import build_features_targets
-from docs.crop_yield_study.data_process import dataset_from_arrays as dataset_from_arrays
+from ..crop_yield_study.data_process import build_features_targets
+from ..crop_yield_study.data_process import dataset_from_arrays as dataset_from_arrays
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--distribution', type=str, default="tukey")
