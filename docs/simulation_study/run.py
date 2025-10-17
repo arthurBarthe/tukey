@@ -1,5 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
+from ignite.contrib.handlers.time_profilers import BasicTimeProfiler
 from ignite.engine import create_supervised_evaluator
 from ignite.metrics import Loss
 from scipy.stats import t
@@ -99,6 +100,10 @@ def objective(trial: optuna.Trial) -> float:
 
         trainer = create_supervised_trainer(nn, optimizer, loss, device='cuda:0')
 
+        # add a profiler
+        basic_profiler = BasicTimeProfiler()
+        basic_profiler.attach(trainer)
+
         val_metrics = {
             "loss": Loss(loss),
         }
@@ -130,16 +135,23 @@ def objective(trial: optuna.Trial) -> float:
             scheduler.step()
 
         trainer.run(dataloader, max_epochs=N_EPOCHS)
+        basic_profiler.write_results('profiler_results.csv')
+        artifact_id = upload_artifact(artifact_store=optuna_artifact_store,
+                                      file_path="profiler_results.csv",
+                                      study_or_trial=trial)
+        trial.set_user_attr("profiler_artifact_id", artifact_id)
         # save trained model
         torch.save(nn, 'model.pth')
-        artifact_id = upload_artifact(artifact_store=optuna_artifact_store, file_path='model.pth', study_or_trial=trial)
+        artifact_id = upload_artifact(artifact_store=optuna_artifact_store,
+                                      file_path='model.pth',
+                                      study_or_trial=trial)
         trial.set_user_attr('model_artifact_id', artifact_id)
         import os
         os.remove('model.pth')
 
         tensorboard_writer.flush()
         tensorboard_writer.close()
-        return train_evaluator.state.metrics["loss"]
+        return val_evaluator.state.metrics["loss"]
     except Exception as e:
         return np.inf
 

@@ -19,6 +19,7 @@ val_lkh = []
 test_lkh = []
 datasets_ = []
 method = []
+metrics = []
 
 for dataset_id in datasets:
     try:
@@ -28,6 +29,7 @@ for dataset_id in datasets:
         continue
     val_lkh.append(study_g.best_value)
     test_lkh.append(study_g.user_attrs["loss"])
+    metrics.append(study_g.user_attrs)
     datasets_.append(dataset_id)
     method.append("gaussian")
     print(dataset_id)
@@ -41,6 +43,7 @@ for dataset_id in datasets:
         continue
     val_lkh.append(study_t.best_value)
     test_lkh.append(study_t.user_attrs["loss"])
+    metrics.append(study_t.user_attrs)
     datasets_.append(dataset_id)
     method.append("tukey")
     print(dataset_id)
@@ -48,6 +51,8 @@ for dataset_id in datasets:
 
 import numpy as np
 df = pd.DataFrame(dict(dataset_id=datasets_, method=method, val=val_lkh, test=test_lkh))
+metrics_df = pd.DataFrame(metrics)
+metrics_df = pd.concat([df, metrics_df], axis=1)
 
 # Group by method and obtain summary statistics
 result = df.groupby("method").agg(['mean', 'std', 'min', 'max'])
@@ -65,3 +70,11 @@ ratios = {
 # Combine into a new DataFrame
 result = pd.DataFrame(ratios).reset_index()
 print(result.mean()[["val_ratio", "test_ratio"]])
+
+# Obtain pinball losses
+pinball_df = metrics_df[["method", "q01", "q05", "q25", "q50", "q75", "q95", "q99"]]
+pinball_df = pinball_df.groupby("method").mean()
+pct = (pinball_df.loc["gaussian"] - pinball_df.loc["tukey"]) / pinball_df.loc["gaussian"]
+pct = pd.DataFrame([pct, ], index=["\%"]) * 100
+pinball_df = pd.concat([pinball_df, pct], axis=0)
+print(pinball_df.to_latex())
