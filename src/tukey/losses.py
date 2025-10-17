@@ -7,6 +7,7 @@ a loss function based on the Gaussian likelihood with two parameters,
 mean and precision.
 """
 import torch
+from torch.distributions import LogNormal
 from torch.nn.modules.loss import _Loss
 from scipy.stats import norm
 from enum import Enum
@@ -102,6 +103,39 @@ class CauchyLoss(_Loss):
         return list(range(self.n_target_channels, self.n_required_channels))
 
 
+class LogNormalLoss(_Loss):
+    def __init__(self, n_target_channels: int = 1):
+        super().__init__()
+        self.n_target_channels = n_target_channels
+
+    @property
+    def n_required_channels(self):
+        return 2 * self.n_target_channels
+
+    def pointwise_likelihood(self, input: torch.Tensor, target: torch.Tensor):
+        # Split the target into mean (first half of channels) and scale
+        mean, precision = torch.split(input, self.n_target_channels, dim=1)
+        precision = self._transform_precision(precision)
+        if not torch.all(precision > 0):
+            raise ValueError('Got a non-positive variance value. \
+                             Pre-processed variance tensor was: \
+                                 {}'.format(torch.min(precision)))
+        dist = LogNormal(mean, 1 / precision)
+        return dist.log_prob(target)
+
+    def forward(self, input: torch.Tensor, target: torch.Tensor):
+        # mean, precision = torch.split(input, self.n_target_channels, dim=1)
+        # precision = self._transform_precision(precision)
+        # input = torch.cat((mean, precision), dim=1)
+        lkhs = self.pointwise_likelihood(input, target)
+        # Ignore nan values in targets.
+        lkhs = lkhs[~torch.isnan(target)]
+        return lkhs.mean()
+
+    def _transform_precision(self, precision):
+        return softplus(precision)
+
+
 class GaussianLoss(_Loss):
     """Class for Gaussian likelihood"""
 
@@ -151,6 +185,12 @@ class GaussianLoss(_Loss):
         lkhs = lkhs[~torch.isnan(target)]
         return lkhs.mean()
 
+    def icdf(self, input: torch.Tensor, alpha: torch.Tensor):
+        from torch.distributions import Normal
+        mu, beta = self.predict(input)
+        dist = Normal(mu, 1 / beta)
+        return dist.icdf(torch.tensor([alpha], device=input.device))
+
     def predict(self, input: torch.Tensor):
         mean, precision = torch.split(input, self.n_target_channels, dim=1)
         precision = self._transform_precision(precision)
@@ -160,6 +200,14 @@ class GaussianLoss(_Loss):
         """Return the mean of the conditional distribution"""
         mean, precision = torch.split(input, self.n_target_channels, dim=1)
         return mean + self.bias
+
+    def predict_ci(self, input, alpha=0.95):
+        mean, precision = self.predict(input)
+        lb = norm.ppf((1 - alpha) / 2)
+        ub = -lb
+        lb = mean + lb / precision
+        ub = mean + ub / precision
+        return lb, ub
 
     def residuals(self, input, target):
         mean, precision = torch.split(input, self.n_target_channels, dim=1)
@@ -349,7 +397,7 @@ class Tuckey_g_h_inverse(Function):
 
 
 class TuckeyGandHloss(_Loss):
-    def __init__(self, n_target_channels: int = 2, hmax: float = 1, gmax: float = 1):
+    def __init__(self, n_target_channels: int = 1, hmax: float = 1, gmax: float = 1):
         super().__init__()
         self.n_target_channels = n_target_channels
         self.gmax = gmax
@@ -399,6 +447,19 @@ class TuckeyGandHloss(_Loss):
         beta = self._transform_beta(beta)
         g, h = self._transform_g_h(g, h)
         return epsilon, beta, g, h
+
+    def predict_mean(self, input: torch.Tensor):
+        epsilon, beta, g, h = self.predict(input)
+        a = 1 / (g * torch.sqrt(1 - h))
+        b = torch.exp(g ** 2 / (2 * (1 - h)))
+        return epsilon + 1 / beta * (a * (b - 1))
+
+    def icdf(self, input: torch.tensor, alpha):
+        epsilon, beta, g, h = self.predict(input)
+        from torch.distributions import Normal
+        dist = Normal(0, 1)
+        q = dist.icdf(torch.tensor([alpha], device=input.device))
+        return epsilon + 1 / beta * self.tuckey_g_h(q, g, h)
 
     def predict_ci(self, input, alpha=0.95):
         epsilon, beta, g, h = torch.split(input, self.n_target_channels, dim=1)
