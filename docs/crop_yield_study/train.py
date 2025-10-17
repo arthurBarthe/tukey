@@ -127,7 +127,7 @@ def objective(trial: optuna.Trial) -> float:
         os.remove('model.pth')
 
         return validation_evaluator.state.metrics["loss"]
-    except Exception as e:
+    except ValueError as e:
         warnings.warn("Trial failed - returning infinite loss.")
         return np.inf
 
