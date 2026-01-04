@@ -467,6 +467,14 @@ class TuckeyGandHloss(_Loss):
         b = torch.exp(g ** 2 / (2 * (1 - h)))
         return epsilon + 1 / beta * (a * (b - 1))
 
+    def cdf(self, input: torch.Tensor, target: torch.Tensor):
+        epsilon, beta, g, h = self.predict(input)
+        from torch.distributions import Normal
+        dist = Normal(0, 1)
+        z_tilda = (target - epsilon) * beta
+        z = self.inverse_tuckey.apply(z_tilda, g, h)
+        return dist.cdf(z)
+
     def icdf(self, input: torch.tensor, alpha):
         epsilon, beta, g, h = self.predict(input)
         from torch.distributions import Normal
