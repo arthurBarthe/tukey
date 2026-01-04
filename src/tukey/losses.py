@@ -6,8 +6,10 @@ In this module we define custom loss functions. In particular we define
 a loss function based on the Gaussian likelihood with two parameters,
 mean and precision.
 """
+import warnings
+
 import torch
-from torch.distributions import LogNormal
+from torch.distributions import LogNormal, Normal
 from torch.nn.modules.loss import _Loss
 from scipy.stats import norm
 from enum import Enum
@@ -217,6 +219,16 @@ class GaussianLoss(_Loss):
     def _transform_precision(self, precision):
         return softplus(precision)
 
+    def crps(self, input: torch.Tensor, target: torch.Tensor):
+        mean, precision = self.predict(input)
+        zs = torch.linspace(-6, 6, 10000).reshape(1, -1).to(device=input.device)
+        dist = Normal(torch.zeros((1, )).to(device=input.device), torch.ones((1, )).to(device=input.device))
+        cdfs = dist.cdf(zs)
+        indicators = (target <= (mean + zs / precision)) * 1.
+        derivative = 1 / precision
+        return 12 * torch.mean((cdfs - indicators) ** 2 * derivative, dim=1)
+
+
     def sample(self, params: torch.tensor, z: torch.tensor = None):
         """
         Sample from i.i.d. Gaussian distributions with parameters specified by the passed params (although they still
@@ -295,7 +307,6 @@ class BivariateGaussianLoss(_Loss):
 
 
 class Tuckey_g_h_inverse(Function):
-
     @staticmethod
     def tuckey_g_h(z, g, h):
         out = 1 / g * torch.expm1(g * z) * torch.exp(h * z ** 2 / 2)
@@ -324,8 +335,10 @@ class Tuckey_g_h_inverse(Function):
         middle[torch.isnan(z_tilda)] = np.nan
         if ctx is not None:
             ctx.save_for_backward(middle, g, h)
-        assert not torch.any(middle == min__), 'Left boundary'
-        assert not torch.any(middle == max__), 'right boundary'
+        if torch.any(middle == min__):
+            warnings.warn("Left boundary during inversion")
+        if torch.any(middle == max__):
+            warnings.warn("Right boundary during inversion")
         return middle
 
     @staticmethod
@@ -407,7 +420,7 @@ class TuckeyGandHloss(_Loss):
     @staticmethod
     def tuckey_g_h(z, g, h):
         out = 1 / g * torch.expm1(g * z) * torch.exp(h * z ** 2 / 2)
-        out[g == 0] = (z * torch.exp(h * z ** 2 / 2))[g == 0]
+#        out[g == 0] = (z * torch.exp(h * z ** 2 / 2))[g == 0]
         return out
 
     @property
@@ -508,6 +521,15 @@ class TuckeyGandHloss(_Loss):
         if z is None:
             z = torch.randn_like(epsilon)
         return epsilon + 1 / beta * self.tuckey_g_h(z, g, h)
+
+    def crps(self, input: torch.Tensor, target: torch.Tensor):
+        epsilon, beta, g, h = self.predict(input)
+        zs = torch.linspace(-6, 6, 10000).reshape(1, -1).to(device=input.device)
+        dist = Normal(torch.zeros((1, )).to(device=input.device), torch.ones((1, )).to(device=input.device))
+        cdfs = dist.cdf(zs)
+        indicators = (target <= (epsilon + self.tuckey_g_h(zs, g, h) / beta)) * 1.
+        derivative = self.inverse_tuckey.d_tau_d_z(zs, g, h) / beta
+        return 12 * torch.mean((cdfs - indicators) ** 2 * derivative, dim=1)
 
 
 if __name__ == '__main__':
